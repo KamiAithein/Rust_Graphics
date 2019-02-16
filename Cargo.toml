@@ -1,5 +1,5 @@
 [package]
-name = "Rust_Graphics"
+name = "Rust_Graphics_refactor"
 version = "0.1.0"
 authors = ["KamiAithein <k3nnethwkoepcke@gmail.com>"]
 edition = "2018"

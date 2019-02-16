@@ -1,5 +1,5 @@
 [[package]]
-name = "Rust_Graphics"
+name = "Rust_Graphics_refactor"
 version = "0.1.0"
 dependencies = [
  "cgmath 0.17.0 (registry+https://github.com/rust-lang/crates.io-index)",

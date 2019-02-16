@@ -1,189 +1,166 @@
-extern crate cgmath;
-use cgmath::{Point3 as Point, InnerSpace, Vector3};
+extern crate image as im;
+use im::{DynamicImage, RgbImage, Rgba, Pixel, GenericImage, ImageBuffer};
 
-extern crate image;
-use image::{DynamicImage, RgbImage, Rgba, Pixel, GenericImage};
+extern crate piston_window;
 
-use std::ops::Mul;
+use piston_window::*;
 
-pub mod scene;
-use crate::scene::{Scene, Sphere, Intersection, Light, Element};
-
-mod rendering;
-use crate::rendering::{Ray, Intersectable, Surface_Normal};
+use piston_window::types::Color as p_color;
 
 use std::path::Path;
 
+mod scene;
+use crate::scene::*;
 
+mod vector3;
+use crate::vector3::*;
 
-pub fn render(scene: &Scene) -> DynamicImage {
-    let mut image = DynamicImage::new_rgb8(scene.width, scene.height);
-    let black = Rgba::from_channels(0,0,0,0);
-    for x in 0..scene.width{
-        for y in 0..scene.height{
-            let ray = Ray::create_prime(x, y, scene);
-            for sphere in scene.elements.iter(){
-                let intersect = sphere.intersect(&ray);
-                if(intersect != None){
-                    image.put_pixel(x, y, get_color(scene, &ray, &Intersection::new(sphere.intersect(&ray).unwrap(), sphere)));
-                }
-                
-            }
+mod color;
+use crate::color::*;
+
+mod point;
+use crate::point::*;
+
+mod rendering;
+use crate::rendering::*;
+
+//pub fn render(scene: &Scene, c: &Context, g: &mut G2d, window: PistonWindow) -> DynamicImage {
+    
+    //image.save(Path::new("./hi.png"));
+    //image
+//}
+
+fn test_scene(frames: f64) -> Scene{
+    let mut vec: Vec<Drawable> = Vec::new();
+    
+    vec.push(
+        Drawable::Sphere(Sphere{
+            center: Point {
+                x: -1.0 + frames/10.0,
+                y: -0.5,
+                z: -10.0,
+            },
+            radius: 4.0,
+            color: Color {
+                r: 0.0,
+                g: 1.0,
+                b: 0.0,
+                a: 0.5,
+            },
+            albedo: 1.0,
+            })
+    );
+    
+    vec.push(
+        Drawable::Sphere(Sphere{
+            center: Point {
+                x: 0.0,
+                y: -0.5 + frames/100.0,
+                z: -5.0,
+            },
+            radius: 1.0,
+            color: Color {
+                r: 0.0,
+                g: 0.0,
+                b: 1.0,
+                a: 1.0,
+            },
+            albedo: 1.0,
+            })
+    );
+    vec.push(
+        Drawable::Sphere(Sphere{
+            center: Point {
+                x: 2.0 - frames/200.0,
+                y: -0.5,
+                z: -2.0 - frames/10.0,
+            },
+            radius: 0.5,
+            color: Color {
+                r: 1.0,
+                g: 0.0,
+                b: 0.0,
+                a: 0.5,
+            },
+            albedo: 1.0,
+            })
+    );
+    
+    Scene {
+        width: 800,
+        height: 600,
+        fov: 90.0,
+        drawables: vec,
+        light: Light{
+            color: Color{
+                r: 1.0,
+                g: 1.0,
+                b: 1.0,
+                a: 0.5,
+            },
+            direction: Vector3::new(-2.0 + frames/10.0, -2.0 + frames, -2.0 + frames/10.0),
+            intensity: 5.0,
         }
     }
-    image.save(Path::new("./hi.png"));
-    image
 }
 
-#[test]
-fn test_can_render_scene() {
-    let mut vec: Vec<Element> = Vec::new();
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: 0.0,
-                y: 1.0,
-                z: -10.0,
-            },
-            radius: 1.0,
-            color: Rgba{
-                data: [125, 125, 0, 125],
-            },
-            albedo: 1.0,
-            })
-    );
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: 10.0,
-                y: 0.0,
-                z: -5.0,
-            },
-            radius: 2.0,
-            color: Rgba{
-                data: [0, 125, 0, 125],
-            },
-            albedo: 125.0,
-            })
-    );
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: 2.9,
-                y: 1.0,
-                z: -5.0,
-            },
-            radius: 2.0,
-            color: Rgba{
-                data: [0, 0, 255, 125],
-            },
-            albedo: 255.0,
-            })
-    );
-    let scene = Scene {
-        width: 800,
-        height: 600,
-        fov: 90.0,
-        elements: vec,
-        light: Light{
-            color: Rgba::from_channels(255, 255, 255, 125),
-            direction: Vector3::new(2.0, 2.0, 2.0),
-            intensity: 1.0,
+fn main() {
+    let mut frame = 0.0;
+    let mut scene = test_scene(frame);
+
+    let (width, height) = (1000, 900);
+    let mut window: PistonWindow = WindowSettings::new(
+        "fractal",
+        [
+            width,
+            height,
+        ],
+    ).exit_on_esc(true).build().unwrap();
+
+    //let mut image = DynamicImage::new_rgb8(scene.width, scene.height);
+
+    let mut imgbuf: im::ImageBuffer<im::Rgba<u8>, _> = im::ImageBuffer::new(scene.width as u32, scene.height as u32);
+
+    let mut texture: G2dTexture = Texture::from_image(
+        &mut window.factory,
+        &imgbuf,
+        &TextureSettings::new()
+    ).unwrap();
+    let black = Rgba::from_channels(0,0,0,0);
+    
+    while let Some(event) = window.next(){
+        if let Some(_) = event.render_args(){
+            imgbuf = im::ImageBuffer::new(scene.width as u32, scene.height as u32);
+            frame += 1.0;
+            scene = test_scene(frame);
+            for x in 0..scene.width{
+                for y in 0..scene.height{
+                    let ray = Ray::create_prime(x, y, &scene);
+                    let intersect = scene.trace(&ray);
+                        match intersect {
+                            // The division was valid
+                            Some(intersection) => {
+                                let color =  rendering::get_color(&scene, &ray, &intersection);
+                                let rgba = color.to_rgba();
+                                //image.put_pixel(x, y, rgba);
+                                
+                                imgbuf.put_pixel(x, y, rgba);
+                            },
+                            // The division was invalid
+                            None    => {}
+                        }
+                }
+            }
+            texture.update(&mut window.encoder, &imgbuf).unwrap();
+            window.draw_2d(&event, |c, g|{
+            clear([0.0,0.0,0.0,0.0], g);
+            image(&texture, c.transform, g);
+        });
         }
-    };
+        
+        event.update(|args|{
 
-    let img: DynamicImage = render(&scene);
-    let rgb: RgbImage = img.to_rgb();
-    let (rgb_width, rgb_height) = rgb.dimensions();
-
-    assert_eq!(scene.width, rgb_width);
-    assert_eq!(scene.height, rgb_height);
+        });
+    }
 }
-
-fn main(){
-    let mut vec: Vec<Element> = Vec::new();
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: -4.0,
-                y: -2.0,
-                z: -20.0,
-            },
-            radius: 7.5,
-            color: Rgba{
-                data: [0, 125, 0, 125],
-            },
-            albedo: 100.0,
-            })
-    );
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: 0.0,
-                y: 1.0,
-                z: -10.0,
-            },
-            radius: 1.0,
-            color: Rgba{
-                data: [125, 125, 0, 125],
-            },
-            albedo: 1.0,
-            })
-    );
     
-    vec.push(
-        Element::Sphere(Sphere{
-            center: Point {
-                x: 2.9,
-                y: 1.0,
-                z: -5.0,
-            },
-            radius: 2.0,
-            color: Rgba{
-                data: [0, 0, 255, 125],
-            },
-            albedo: 0.75,
-            })
-    );
-    let scene = Scene {
-        width: 800,
-        height: 600,
-        fov: 90.0,
-        elements: vec,
-        light: Light{
-            color: Rgba::from_channels(255, 255, 255, 255),
-            direction: Vector3::new(2.0, 0.0, 2.0),
-            intensity: 2000.0,
-        }
-    };
-    
-    render(&scene);
-}
-
-fn get_color(scene: &Scene, ray: &Ray, intersection: &Intersection) -> Rgba<u8> {
-    let hit_point = ray.origin + (ray.direction * intersection.distance);
-    let surface_normal = intersection.element.surface_normal(&hit_point);
-    let direction_to_light = -scene.light.direction.normalize();
-    let light_power = (surface_normal.dot(direction_to_light) as f32).max(0.0) *
-                      scene.light.intensity;
-    let light_reflected = intersection.element.albedo() / std::f32::consts::PI as f64;
-
-    let i = intersection.element.color().clone().data;
-
-    let (ir, ig, ib, ia) = (i[0], i[1], i[2], i[3]);
-
-    let s = scene.light.color.clone().data;
-
-    let (sr, sg, sb, sa) = (s[0], s[1], s[2], s[3]);
-
-    let mut r = ir as f64 + sr as f64 + light_power as f64 + light_reflected;
-    let mut g = ig as f64 + sg as f64 + light_power as f64 + light_reflected;
-    let mut b = ib as f64 + sb as f64 + light_power as f64 + light_reflected;
-    r /= 4.0;
-    g /= 4.0;
-    b /= 4.0;
-
-
-    
-    Rgba::from_channels(r as u8, g as u8, b as u8,125)
-}
